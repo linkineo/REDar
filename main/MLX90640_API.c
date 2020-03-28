@@ -16,6 +16,7 @@
  */
 
 #include "MLX90640_API.h"
+#include "esp_log.h"
 #include <math.h>
 
 void ExtractVDDParameters(uint16_t *eeData, paramsMLX90640 *mlx90640);
@@ -39,6 +40,52 @@ int IsPixelBad(uint16_t pixel,paramsMLX90640 *params);
 int MLX90640_DumpEE(uint8_t slaveAddr, uint16_t *eeData)
 {
      return REDAR_I2CRead(slaveAddr, 0x2400, 832, eeData);
+}
+
+int MLX90640_GetSubFrameData(uint8_t slaveAddr, uint16_t *frameData)
+{
+    uint16_t dataReady = 0;
+    uint16_t controlRegister1;
+    uint16_t statusRegister;
+    int error = 1;
+    uint8_t cnt = 0;
+    
+    //is dara ready for readout
+    while(dataReady == 0)
+    {
+        error = REDAR_I2CRead(slaveAddr, 0x8000, 1, &statusRegister);
+        if(error != 0)
+        {
+            return error;
+        }    
+        dataReady = statusRegister & 0x0008;
+    }       
+        
+ 
+    //resetting dataRead flag and enabling next measurement cycle
+    error = REDAR_I2CWrite(slaveAddr, 0x8000, 0x0030);
+    if(error == -1)
+    {
+        return error;
+    }
+    
+    //reading frame
+    error = REDAR_I2CRead(slaveAddr, 0x0400, 832, frameData); 
+    if(error != 0)
+    {
+        return error;
+    }
+    
+    error = REDAR_I2CRead(slaveAddr, 0x800D, 1, &controlRegister1);
+    frameData[832] = controlRegister1;
+    frameData[833] = statusRegister & 0x0001;
+    
+    if(error != 0)
+    {
+        return error;
+    }
+    
+    return frameData[833];    
 }
 
 int MLX90640_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
@@ -85,6 +132,7 @@ int MLX90640_GetFrameData(uint8_t slaveAddr, uint16_t *frameData)
     
     if(cnt > 4)
     {
+       ESP_LOGI("redar","timeout in reading second page");
         return -8;
     }    
     

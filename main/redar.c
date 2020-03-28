@@ -17,7 +17,7 @@ static uint16_t mlx90640Frame[834];
 paramsMLX90640 mlx90640;
 static float mlx90640To[768];
 int status;
-const TickType_t xDelay = 1000 / portTICK_PERIOD_MS;
+const TickType_t xDelay = 2000 / portTICK_PERIOD_MS;
 
 
 void app_main(void)
@@ -32,8 +32,14 @@ void app_main(void)
     while(1)
     {
         // default mode is chess mode, only every second pixel will be updated
-        //2 cycles needed for full image update
-        MLX90640_GetFrameData (slaveAddress, mlx90640Frame);
+        //2 subframes needed for full image update
+        //default sampling on sensor is 2Hz. 
+       
+        MLX90640_GetSubFrameData (slaveAddress, mlx90640Frame);
+        tr = MLX90640_GetTa(mlx90640Frame, &mlx90640) - TA_SHIFT;
+        MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
+
+        MLX90640_GetSubFrameData (slaveAddress, mlx90640Frame);
         tr = MLX90640_GetTa(mlx90640Frame, &mlx90640) - TA_SHIFT;
         MLX90640_CalculateTo(mlx90640Frame, &mlx90640, emissivity, tr, mlx90640To);
 
